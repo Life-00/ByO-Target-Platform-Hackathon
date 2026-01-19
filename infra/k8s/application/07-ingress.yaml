@@ -4,20 +4,12 @@ metadata:
   name: tva-ingress
   namespace: tva
   annotations:
-    # k3s 기본 ingress 컨트롤러가 Traefik인 경우가 많아서 권장
     kubernetes.io/ingress.class: traefik
-
-    # (선택) 큰 요청 바디 필요하면(업로드 등) Traefik/Nginx 쪽 설정이 추가로 필요할 수 있음
-    # traefik.ingress.kubernetes.io/buffering: "true"
 spec:
   ingressClassName: traefik
   rules:
-    - host: tva.example.com   # TODO: 실제 도메인으로 변경
-      http:
+    - http:
         paths:
-          # ✅ Backend (FastAPI) - /api 이하로 라우팅
-          # 프론트에서 VITE_API_BASE_URL을 "https://tva.example.com"로 두고,
-          # API 호출을 "/api/v1/..." 형태로 하도록 맞추는 걸 추천
           - path: /api
             pathType: Prefix
             backend:
@@ -25,8 +17,6 @@ spec:
                 name: backend
                 port:
                   number: 8000
-
-          # ✅ Frontend (nginx 정적) - 나머지는 전부 프론트로
           - path: /
             pathType: Prefix
             backend:
@@ -35,8 +25,3 @@ spec:
                 port:
                   number: 80
 
-  # (선택) TLS 붙일 때
-  # tls:
-  #   - hosts:
-  #       - tva.example.com
-  #     secretName: tva-tls
