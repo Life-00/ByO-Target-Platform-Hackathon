@@ -1,22 +1,18 @@
-# 1) build stage
-FROM node:20-alpine AS build
+FROM node:20-alpine
+
 WORKDIR /app
 
+# Copy package files
 COPY package*.json ./
-RUN npm ci
 
-# ✅ build-time vars
-ARG VITE_API_BASE_URL
-ARG VITE_API_VERSION
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_API_VERSION=$VITE_API_VERSION
+# Install dependencies
+RUN npm install
 
+# Copy application code
 COPY . .
-RUN npm run build
 
-# 2) run stage (nginx)
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# Expose Vite dev server port
+EXPOSE 5173
 
+# Start development server with host binding
+CMD ["npm", "run", "dev"]
