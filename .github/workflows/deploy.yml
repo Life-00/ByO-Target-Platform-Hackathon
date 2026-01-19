@@ -100,19 +100,16 @@ jobs:
             echo "Frontend image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}"
 
             # YAML 내 image 라인을 새 태그로 교체
-            sed -i "s|image: ${IMAGE_PREFIX}-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
-            sed -i "s|image: ${IMAGE_PREFIX}-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
+            sed -i "s|image: ${IMAGE_PREFIX}-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "$BACKEND_YAML" || true
+            sed -i "s|image: ${IMAGE_PREFIX}-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "$FRONTEND_YAML" || true
 
-            # 만약 기존 YAML이 고정 경로(ghcr.io/life-00/...)를 쓰고 있었다면 그것도 함께 치환
-            sed -i "s|image: ghcr.io/.*/byo-tva-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
-            sed -i "s|image: ghcr.io/.*/byo-tva-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
+            sed -i "s|image: ghcr.io/.*/byo-tva-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "$BACKEND_YAML" || true
+            sed -i "s|image: ghcr.io/.*/byo-tva-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "$FRONTEND_YAML" || true
 
-            # 적용
-            kubectl -n "${NAMESPACE}" apply -f "${BACKEND_YAML}"
-            kubectl -n "${NAMESPACE}" apply -f "${FRONTEND_YAML}"
+            kubectl -n "$NAMESPACE" apply -f "$BACKEND_YAML"
+            kubectl -n "$NAMESPACE" apply -f "$FRONTEND_YAML"
 
-            # 롤아웃 확인
-            kubectl -n "${NAMESPACE}" rollout status deploy/backend --timeout=240s
-            kubectl -n "${NAMESPACE}" rollout status deploy/frontend --timeout=240s
+            kubectl -n "$NAMESPACE" rollout status deploy/backend --timeout=240s
+            kubectl -n "$NAMESPACE" rollout status deploy/frontend --timeout=240s
 
             echo "✅ Deployment finished."
