@@ -9,21 +9,36 @@ SEARCH_QUERY_GENERATION_PROMPT = """You are an expert at converting research que
 User's Question: {content}
 Analysis Goal: {analysis_goal}
 
-Task: Generate a concise, effective arXiv search query (2-10 keywords) that will find relevant academic papers.
+Task: Generate a concise, effective arXiv search query (2-6 core keywords) optimized for academic paper search.
 
-Guidelines:
-- Focus on technical terms and key concepts
-- Use academic/scientific terminology
-- Avoid common words and articles
-- Keep it focused and specific
+CRITICAL RULES for Academic Paper Search:
+1. Use SIMPLE, CONCRETE terms that actually appear in paper titles/abstracts
+2. AVOID meta-analysis terms: "compare", "comparison", "safety profile", "evaluation", "review"
+3. Use SPECIFIC scientific terminology:
+   - For toxicity: "toxicity", "liver injury", "hepatotoxicity", "adverse events", "ALT", "AST"
+   - For mechanisms: "mechanism", "pathway", "binding", "inhibition"
+   - For drug names: use exact compound names or generic names
+4. Break down complex questions into their CORE CONCEPTS only
+5. If question asks for "comparison", just include the main entities (e.g., "HER2 inhibitor hepatotoxicity" NOT "compare HER2 inhibitors")
 
-Respond with ONLY the search query, no explanations.
+BAD Examples (too ambitious, won't find papers):
+❌ "HER2 inhibitors" AND "hepatotoxicity" COMPARE "approved therapies"
+❌ "SAFETY PROFILES" "neratinib" "tucatinib"
+❌ "compare efficacy" "immunotherapy" "chemotherapy"
+
+GOOD Examples (simple, concrete terms):
+✅ HER2 inhibitor hepatotoxicity
+✅ neratinib liver toxicity
+✅ immunotherapy melanoma
+✅ CRISPR gene editing safety
+
+Respond with ONLY the search query (2-6 keywords), no explanations or quotes.
 
 Search Query:"""
 
 
-# Prompt for evaluating paper relevance
-RELEVANCE_EVALUATION_PROMPT = """You are an expert at evaluating research paper relevance.
+# Enhanced prompt for comprehensive paper evaluation
+ENHANCED_RELEVANCE_EVALUATION_PROMPT = """You are an expert research evaluator specializing in biomedical literature.
 
 User's Research Interest:
 - Question: {content}
@@ -33,12 +48,26 @@ Paper Information:
 - Title: {title}
 - Abstract: {abstract}
 
-Task: Evaluate how relevant this paper is to the user's research interest.
+Task: Evaluate this paper across THREE dimensions:
+
+1. RELEVANCE: How directly related is this paper to the user's research question?
+2. RELIABILITY: How trustworthy and well-documented is this research?
+3. COVERAGE: What specific aspects of the research question does this paper address?
 
 Respond with ONLY a JSON object in this exact format:
-{{"relevance_score": 0.85, "reason": "brief explanation"}}
+{{
+    "relevance_score": 0.85,
+    "reliability_indicators": {{
+        "has_experimental_data": true,
+        "has_numerical_results": true,
+        "methodology_clear": true,
+        "is_preprint": false
+    }},
+    "coverage_aspects": ["in_vitro", "dose_response", "mechanism"],
+    "overall_reason": "brief explanation"
+}}
 
-The relevance_score should be between 0.0 (not relevant) and 1.0 (highly relevant)."""
+Scores should be between 0.0 and 1.0."""
 
 
 # Prompt for extracting requested paper count from user input
