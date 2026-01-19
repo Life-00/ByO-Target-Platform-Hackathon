@@ -74,32 +74,33 @@ jobs:
       # - EC2_SSH_KEY: pem 내용 전체(-----BEGIN ... 포함)
       - name: Deploy on K3s (EC2)
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+          K8S_DIR: ${{ env.K8S_DIR }}
+          BACKEND_YAML: ${{ env.BACKEND_YAML }}
+          FRONTEND_YAML: ${{ env.FRONTEND_YAML }}
+          NAMESPACE: ${{ env.NAMESPACE }}
+          VERSION_TAG: ${{ env.VERSION_TAG }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_PREFIX,K8S_DIR,BACKEND_YAML,FRONTEND_YAML,NAMESPACE,VERSION_TAG
           script: |
             set -euo pipefail
-
+            echo "K8S_DIR=${K8S_DIR}"
+            echo "VERSION_TAG=${VERSION_TAG}"
             REPO_DIR="/home/ubuntu/deploy/ByO-Target-Platform-Hackathon"
             cd "${REPO_DIR}"
-
-            # deploy 브랜치 최신화
             git fetch --all
             git checkout deploy || git checkout -b deploy
             git pull --ff-only origin deploy
 
             cd "${REPO_DIR}/${K8S_DIR}"
 
-            echo "Deploying images with tag: ${VERSION_TAG}"
-            echo "Backend image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}"
-            echo "Frontend image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}"
-
-            # YAML image 라인을 새 태그로 교체 (유연하게 매칭)
             sed -i "s|image: .*byo-target-platform-hackathon-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
             sed -i "s|image: .*byo-target-platform-hackathon-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
 
-            # 혹시 예전 하드코딩(다른 레포/이름) 남아있을 때도 같이 치환
             sed -i "s|image: ghcr.io/.*/byo-tva-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
             sed -i "s|image: ghcr.io/.*/byo-tva-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
 
@@ -108,7 +109,8 @@ jobs:
 
             kubectl -n "${NAMESPACE}" rollout status deploy/backend --timeout=240s
             kubectl -n "${NAMESPACE}" rollout status deploy/frontend --timeout=240s
-
+            
+            
             echo "✅ Deployment finished."
 
 
