@@ -14,7 +14,7 @@ data:
   CHROMADB_HOST: "chromadb"
   CHROMADB_PORT: "8000"
   # 컨테이너 내부 경로로 둘 것 (PVC 붙일 예정)
-  CHROMA_DB_PATH: "/data"
+  CHROMA_DB_PATH: "/chroma_data"
 
   # Redis (서비스 이름: redis) - Redis를 쓸 경우에만
   REDIS_URL: "redis://redis:6379/0"
