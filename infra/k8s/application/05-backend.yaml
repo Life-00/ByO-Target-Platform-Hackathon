@@ -18,6 +18,8 @@ spec:
       labels:
         app: backend
     spec:
+      imagePullSecrets:
+      - name: ghcr-pull
       containers:
         - name: backend
           image: ghcr.io/life-00/byo-tva-backend:lite
@@ -81,7 +83,7 @@ spec:
   selector:
     app: backend
   ports:
-    - port: 8001
+    - port: 8000
       targetPort: 8000
       protocol: TCP
   type: ClusterIP
