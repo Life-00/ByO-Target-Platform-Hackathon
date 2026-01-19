@@ -115,5 +115,3 @@ chroma_data/
 # Keep alembic.ini
 !alembic.ini
 !backend/alembic.ini
-
-k8s-secrets.env
