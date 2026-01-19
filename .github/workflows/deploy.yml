@@ -12,20 +12,17 @@ jobs:
       packages: write
 
     env:
-      # ===== 고정 이미지 prefix (요청사항) =====
-      # 결과 이미지:
-      # - ghcr.io/life-00/byo-tva-backend:<tag>
-      # - ghcr.io/life-00/byo-tva-frontend:<tag>
-      IMAGE_PREFIX: ghcr.io/life-00/byo-tva
+      # ✅ 레포 기반 GHCR prefix (예: ghcr.io/life-00/byo-target-platform-hackathon)
+      # → 결과 이미지:
+      #   ghcr.io/life-00/byo-target-platform-hackathon-backend:<tag>
+      #   ghcr.io/life-00/byo-target-platform-hackathon-frontend:<tag>
+      IMAGE_PREFIX: ghcr.io/life-00/byo-target-platform-hackathon
 
-      # ===== K8s manifest 경로/파일 (현재 repo 구조 기준) =====
+      # ✅ K8s manifest 경로/파일 (현재 repo 구조 기준)
       K8S_DIR: infra/k8s/application
       BACKEND_YAML: 05-backend.yaml
       FRONTEND_YAML: 06-frontend.yaml
       NAMESPACE: tva
-
-      # ===== EC2에 클론된 repo 경로 (현재 너희 운영 경로 기준) =====
-      REPO_DIR: /home/ubuntu/deploy/ByO-Target-Platform-Hackathon
 
     steps:
       - name: Checkout
@@ -34,14 +31,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GHCR
+      - name: Login to GHCR (repo-scoped)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 버전 태그: UTC timestamp + short sha
+      # ✅ 버전 태그: UTC timestamp + short sha
       - name: Generate version tag
         id: version
         run: |
@@ -84,44 +81,34 @@ jobs:
           script: |
             set -euo pipefail
 
-            # === EC2에서 사용할 값들 (여기서 직접 정의해야 unbound 방지) ===
-            REPO_DIR="${{ env.REPO_DIR }}"
-            K8S_DIR="${{ env.K8S_DIR }}"
-            BACKEND_YAML="${{ env.BACKEND_YAML }}"
-            FRONTEND_YAML="${{ env.FRONTEND_YAML }}"
-            NAMESPACE="${{ env.NAMESPACE }}"
-
-            IMAGE_PREFIX="${{ env.IMAGE_PREFIX }}"
-            VERSION_TAG="${{ env.VERSION_TAG }}"
-
-            cd "$REPO_DIR"
+            REPO_DIR="/home/ubuntu/deploy/ByO-Target-Platform-Hackathon"
+            cd "${REPO_DIR}"
 
             # deploy 브랜치 최신화
             git fetch --all
             git checkout deploy || git checkout -b deploy
             git pull --ff-only origin deploy
 
-            cd "$K8S_DIR"
+            cd "${REPO_DIR}/${K8S_DIR}"
 
             echo "Deploying images with tag: ${VERSION_TAG}"
             echo "Backend image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}"
             echo "Frontend image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}"
 
-            # YAML 내 image 라인을 새 태그로 교체
-            sed -i "s|image: ${IMAGE_PREFIX}-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "$BACKEND_YAML" || true
-            sed -i "s|image: ${IMAGE_PREFIX}-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "$FRONTEND_YAML" || true
+            # YAML image 라인을 새 태그로 교체 (유연하게 매칭)
+            sed -i "s|image: .*byo-target-platform-hackathon-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
+            sed -i "s|image: .*byo-target-platform-hackathon-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
 
-            # 과거에 고정 경로(ghcr.io/life-00/byo-tva-xxx)를 쓰던 경우까지 커버
-            sed -i "s|image: ghcr.io/.*/byo-tva-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "$BACKEND_YAML" || true
-            sed -i "s|image: ghcr.io/.*/byo-tva-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "$FRONTEND_YAML" || true
+            # 혹시 예전 하드코딩(다른 레포/이름) 남아있을 때도 같이 치환
+            sed -i "s|image: ghcr.io/.*/byo-tva-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
+            sed -i "s|image: ghcr.io/.*/byo-tva-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
 
-            # 적용
-            kubectl -n "$NAMESPACE" apply -f "$BACKEND_YAML"
-            kubectl -n "$NAMESPACE" apply -f "$FRONTEND_YAML"
+            kubectl -n "${NAMESPACE}" apply -f "${BACKEND_YAML}"
+            kubectl -n "${NAMESPACE}" apply -f "${FRONTEND_YAML}"
 
-            # 롤아웃 확인
-            kubectl -n "$NAMESPACE" rollout status deploy/backend --timeout=240s
-            kubectl -n "$NAMESPACE" rollout status deploy/frontend --timeout=240s
+            kubectl -n "${NAMESPACE}" rollout status deploy/backend --timeout=240s
+            kubectl -n "${NAMESPACE}" rollout status deploy/frontend --timeout=240s
 
             echo "✅ Deployment finished."
+
 
