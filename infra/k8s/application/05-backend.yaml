@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: tva
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/life-00/byo-tva-backend:lite
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+
+          # (권장) 리소스는 낮게 시작
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          # ✅ ConfigMap(일반 설정) + Secret(민감 값)
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
+
+          # ✅ docker-compose와 동일한 의미로 서비스명으로 연결
+          # (ConfigMap/Secret에 DATABASE_URL이 없더라도 여기서 강제 세팅)
+          env:
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(DB_USER):$(DB_PASSWORD)@postgres:5432/$(DB_NAME)"
+            - name: CHROMADB_HOST
+              value: "chromadb"
+            - name: CHROMADB_PORT
+              value: "8000"
+            - name: CHROMA_DB_PATH
+              value: "/chroma_data"
+
+          # ✅ readiness/liveness: Dockerfile 기준 /health + 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: tva
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8001
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP
