@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: tva
+data:
+  # DB (서비스 이름으로 연결: postgres)
+  DB_USER: "tva"
+  DB_NAME: "tva_db"
+  # DATABASE_URL은 비밀번호 포함 가능성이 있어 Secret로 보내는 걸 권장
+  # (아래 Secret 단계에서 처리)
+
+  # ChromaDB (서비스 이름: chromadb)
+  CHROMADB_HOST: "chromadb"
+  CHROMADB_PORT: "8000"
+  # 컨테이너 내부 경로로 둘 것 (PVC 붙일 예정)
+  CHROMA_DB_PATH: "/data"
+
+  # Redis (서비스 이름: redis) - Redis를 쓸 경우에만
+  REDIS_URL: "redis://redis:6379/0"
+  ENABLE_CACHING: "true"
+  CACHE_TTL: "3600"
+
+  # LLM / Agent (공개 가능 설정)
+  LLM_MODEL: "upstage-solar-pro"
+  LLM_TEMPERATURE: "0.3"
+  LLM_MAX_TOKENS: "2000"
+  LLM_TOP_P: "0.9"
+  AGENT_TIMEOUT: "60"
+  AGENT_RETRY_COUNT: "3"
+
+  # Server
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+
+  # CORS (Ingress 도메인 정해지면 * 대신 도메인으로 바꾸는 걸 추천)
+  ALLOWED_ORIGINS: "*"
+
+  # Uploads (컨테이너 경로)
+  MAX_UPLOAD_SIZE: "52428800"
+  UPLOAD_DIRECTORY: "/uploads"
