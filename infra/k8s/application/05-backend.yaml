@@ -19,7 +19,7 @@ spec:
         app: backend
     spec:
       imagePullSecrets:
-        - name: ghcr-pull
+      - name: ghcr-pull
       containers:
         - name: backend
           image: ghcr.io/life-00/byo-tva-backend:lite
