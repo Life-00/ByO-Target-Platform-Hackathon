@@ -12,15 +12,25 @@ jobs:
       packages: write
 
     env:
-      BACKEND_IMAGE: ghcr.io/life-00/byo-tva-backend
-      FRONTEND_IMAGE: ghcr.io/life-00/byo-tva-frontend
+      # K8s manifest 경로/파일 (현재 repo 구조 기준)
       K8S_DIR: infra/k8s/application
       BACKEND_YAML: 05-backend.yaml
       FRONTEND_YAML: 06-frontend.yaml
+      NAMESPACE: tva
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # GHCR 이미지 prefix를 현재 repo 기준으로 자동 생성
+      # 예: Life-00/ByO-Target-Platform-Hackathon -> ghcr.io/life-00/byo-target-platform-hackathon
+      - name: Set IMAGE prefix
+        run: |
+          set -euo pipefail
+          FULL_REPO="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "IMAGE_PREFIX=ghcr.io/${FULL_REPO}" >> "$GITHUB_ENV"
+          echo "IMAGE_PREFIX is ${IMAGE_PREFIX:-"(will be set next step)"}"
+          echo "Computed IMAGE_PREFIX=ghcr.io/${FULL_REPO}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -32,35 +42,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 버전 태그: UTC timestamp + short sha
       - name: Generate version tag
         id: version
         run: |
           set -euo pipefail
           TS=$(date -u +"%Y%m%d-%H%M%S")
           SHA=$(git rev-parse --short=7 HEAD)
-          echo "version_tag=${TS}-${SHA}" >> "$GITHUB_OUTPUT"
-          echo "VERSION_TAG=${TS}-${SHA}" >> "$GITHUB_ENV"
+          VERSION_TAG="${TS}-${SHA}"
+          echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+          echo "VERSION_TAG=${VERSION_TAG}" >> "$GITHUB_ENV"
+          echo "Generated VERSION_TAG=${VERSION_TAG}"
 
-      - name: Build & Push Backend
+      - name: Build & Push Backend (multi-arch)
         run: |
+          set -euo pipefail
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            -t "${BACKEND_IMAGE}:${VERSION_TAG}" \
-            -t "${BACKEND_IMAGE}:latest" \
+            -t "${IMAGE_PREFIX}-backend:${VERSION_TAG}" \
+            -t "${IMAGE_PREFIX}-backend:latest" \
             --push ./backend
 
-      - name: Build & Push Frontend
+      - name: Build & Push Frontend (multi-arch)
         run: |
+          set -euo pipefail
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            -t "${FRONTEND_IMAGE}:${VERSION_TAG}" \
-            -t "${FRONTEND_IMAGE}:latest" \
+            -t "${IMAGE_PREFIX}-frontend:${VERSION_TAG}" \
+            -t "${IMAGE_PREFIX}-frontend:latest" \
             --push ./frontend
 
-      # ====== 여기부터는 '자동 배포' 단계인데, 먼저 Secrets가 필요함 ======
-      # Settings > Secrets and variables > Actions 에 아래 2개 등록 필요
-      # - EC2_HOST : EC2 공인 IP 또는 도메인
-      # - EC2_SSH_KEY : pem 내용 전체(-----BEGIN ... 포함)
+      # ===== Deploy 단계 =====
+      # 사전 준비(Repo Secrets):
+      # - EC2_HOST: EC2 공인 IP 또는 도메인
+      # - EC2_SSH_KEY: pem 내용 전체(-----BEGIN ... 포함)
       - name: Deploy on K3s (EC2)
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -70,19 +85,34 @@ jobs:
           script: |
             set -euo pipefail
 
+            # EC2에 클론된 repo 경로 (현재 너희가 쓰는 경로 기준)
             cd /home/ubuntu/deploy/ByO-Target-Platform-Hackathon
 
-            git checkout deploy || true
+            # deploy 브랜치 최신화
+            git fetch --all
+            git checkout deploy || git checkout -b deploy
             git pull --ff-only origin deploy
 
             cd "${K8S_DIR}"
 
-            # 이미지 태그를 새 버전으로 교체
-            sed -i "s|image: ${BACKEND_IMAGE}:.*|image: ${BACKEND_IMAGE}:${VERSION_TAG}|g" "${BACKEND_YAML}"
-            sed -i "s|image: ${FRONTEND_IMAGE}:.*|image: ${FRONTEND_IMAGE}:${VERSION_TAG}|g" "${FRONTEND_YAML}"
+            echo "Deploying images with tag: ${VERSION_TAG}"
+            echo "Backend image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}"
+            echo "Frontend image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}"
 
-            kubectl -n tva apply -f "${BACKEND_YAML}"
-            kubectl -n tva apply -f "${FRONTEND_YAML}"
+            # YAML 내 image 라인을 새 태그로 교체
+            sed -i "s|image: ${IMAGE_PREFIX}-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
+            sed -i "s|image: ${IMAGE_PREFIX}-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
 
-            kubectl -n tva rollout status deploy/backend --timeout=180s
-            kubectl -n tva rollout status deploy/frontend --timeout=180s
+            # 만약 기존 YAML이 고정 경로(ghcr.io/life-00/...)를 쓰고 있었다면 그것도 함께 치환
+            sed -i "s|image: ghcr.io/.*/byo-tva-backend:.*|image: ${IMAGE_PREFIX}-backend:${VERSION_TAG}|g" "${BACKEND_YAML}" || true
+            sed -i "s|image: ghcr.io/.*/byo-tva-frontend:.*|image: ${IMAGE_PREFIX}-frontend:${VERSION_TAG}|g" "${FRONTEND_YAML}" || true
+
+            # 적용
+            kubectl -n "${NAMESPACE}" apply -f "${BACKEND_YAML}"
+            kubectl -n "${NAMESPACE}" apply -f "${FRONTEND_YAML}"
+
+            # 롤아웃 확인
+            kubectl -n "${NAMESPACE}" rollout status deploy/backend --timeout=240s
+            kubectl -n "${NAMESPACE}" rollout status deploy/frontend --timeout=240s
+
+            echo "✅ Deployment finished."
