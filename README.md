@@ -1,8 +1,7 @@
 # 🚀 ByO Target Platform (TVA)
 
 > **Build your Own Target Validation Assistant**  
-> 논문은 많지만, 판단에 필요한 구조는 없는 연구 초기 단계를 위해  
-> **Multi-Agent 기반 Target Validation 플랫폼**을 제공합니다.
+> Target Validation Assistant(TVA)는 연구 초기 단계의 의사결정을 돕는 AI 기반 문헌 분석 플랫폼입니다.
 > 🏁 This project was built during a 24-hour hackathon.
 
 ---
@@ -218,10 +217,12 @@ cp .env.example .env
 ```bash
 docker compose up --build
 ```
+### 로컬 개발 (docker-compose 기준)
+
 - Frontend: http://localhost
 - Backend API: http://localhost:8000
 - ChromaDB: http://localhost:8001
-- PostgreSQL: http://localhost:5432
+- PostgreSQL: localhost:5432
 
 ---
 
@@ -259,7 +260,7 @@ CHROMADB_PORT=8000
 
 
 # ===============================
-# Frontend (⚠️ 중요)
+# Frontend (Production)
 # ===============================
 # Ingress 환경에서는 프론트가 같은 도메인에서
 # /api 경로로 backend에 접근하므로 BASE_URL은 비워둡니다.
